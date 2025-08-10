@@ -1,103 +1,178 @@
-import Image from "next/image";
+// ========================================
+// Next.js App – Sequential Blueprint Generation (improved UI)
+// ========================================
+"use client";
+
+import { Button } from "@/components/ui/button";
+import React, { useEffect, useState } from "react";
+import {
+  CheckCircle,
+  Loader2,
+  Circle,
+  XCircle,
+} from "lucide-react";
+import HealthBlueprintUI from "@/components/HealthBlueprintUI";
+
+interface FileStatus {
+  state: "pending" | "processing" | "done" | "error";
+  summary?: string;
+  error?: string;
+}
+
+const FILES: string[] = [
+  "https://whgeuauulzwtyigriged.supabase.co/storage/v1/object/public/media/Amy%20Samuel/Amy's%20Allelica%20polygenic%20panel%20(1).pdf",
+  "https://whgeuauulzwtyigriged.supabase.co/storage/v1/object/public/media/Amy%20Samuel/0057.AS___CRR___Year_2.pdf",
+  "https://whgeuauulzwtyigriged.supabase.co/storage/v1/object/public/media/Amy%20Samuel/amy%20labs.pdf",
+  "https://whgeuauulzwtyigriged.supabase.co/storage/v1/object/public/media/Amy%20Samuel/Amy%20Shpall%20Medical%20Report%20Dec%202023%20(1).pdf",
+  "https://whgeuauulzwtyigriged.supabase.co/storage/v1/object/public/media/Amy%20Samuel/Amy%20Shpall%20Medical%20Report%20July%202025%20(2).pdf",
+  "https://whgeuauulzwtyigriged.supabase.co/storage/v1/object/public/media/Amy%20Samuel/Amy's%20Alzheimer's%20risk%20report%20(1).pdf",
+  "https://whgeuauulzwtyigriged.supabase.co/storage/v1/object/public/media/Amy%20Samuel/Amy's%20InBody,%20EKG,%20Labs%20March%2025%20(1).pdf",
+  "https://whgeuauulzwtyigriged.supabase.co/storage/v1/object/public/media/Amy%20Samuel/Amy's%20mammogram%20May%20'25.pdf",
+  "https://whgeuauulzwtyigriged.supabase.co/storage/v1/object/public/media/Amy%20Samuel/Decades%20Health%20Summary.pdf",
+  "https://whgeuauulzwtyigriged.supabase.co/storage/v1/object/public/media/Amy%20Samuel/Grail%20Order%20558-ECVI-L4Z%20-%20Test%20Result%20Report%20GAL0YLFFLR-1%20(1).pdf",
+];
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [prompt, setPrompt] = useState<string>("");
+  const [blueprint, setBlueprint] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [started, setStarted] = useState<boolean>(false);
+  const [fileStatuses, setFileStatuses] =
+    useState<Record<string, FileStatus>>(() =>
+      Object.fromEntries(FILES.map((f) => [f, { state: "pending" }]))
+    );
+  const [currentFile, setCurrentFile] = useState<string | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Load prompt file on mount
+  useEffect(() => {
+    fetch("/prompts/amy-samuel.txt")
+      .then((res) => res.text())
+      .then(setPrompt)
+      .catch((err) => console.error("Failed to load prompt:", err));
+  }, []);
+
+  async function generate() {
+    if (!prompt) {
+      alert("Prompt is still loading. Please try again in a moment.");
+      return;
+    }
+
+    setStarted(true);
+    setLoading(true);
+    setBlueprint("");
+
+    const summaries: string[] = [];
+
+    for (const fileUrl of FILES) {
+      setCurrentFile(fileUrl);
+      setFileStatuses((s) => ({
+        ...s,
+        [fileUrl]: { state: "processing" },
+      }));
+
+      try {
+        const res = await fetch("/api/summarise-file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileUrl }),
+        });
+        const data = await res.json();
+        summaries.push(`\n### ${fileUrl.split("/").pop()}\n${data.summary}`);
+        setFileStatuses((s) => ({
+          ...s,
+          [fileUrl]: { state: "done", summary: data.summary },
+        }));
+      } catch (err: any) {
+        console.error(err);
+        setFileStatuses((s) => ({
+          ...s,
+          [fileUrl]: { state: "error", error: err.message || "Error" },
+        }));
+      }
+    }
+
+    // Collate summaries and generate blueprint
+    const res = await fetch("/api/generate-blueprint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt,
+        summaries: summaries.join("\n\n"),
+      }),
+    });
+
+    const data = await res.json();
+    setBlueprint(data.blueprint || "No blueprint generated");
+    setLoading(false);
+    setCurrentFile(null);
+  }
+
+  function renderIcon(state: FileStatus["state"]) {
+    switch (state) {
+      case "processing":
+        return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
+      case "done":
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case "error":
+        return <XCircle className="w-4 h-4 text-red-500" />;
+      default:
+        return <Circle className="w-4 h-4 text-gray-300" />;
+    }
+  }
+
+  // ---------- UI ----------
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-8 space-y-6 bg-gray-50">
+      {!blueprint ? (
+        <>
+          <div className="w-full max-w-lg">
+            <Button
+              className="w-full h-16 rounded-full text-lg font-semibold bg-gradient-to-r from-[#F35126] to-[#FE8432]"
+              onClick={generate}
+              disabled={loading || !prompt}
+            >
+              {loading ? "Generating…" : "Generate Blueprint"}
+            </Button>
+          </div>
+
+          {/* Progress list – only visible after generation starts */}
+          {started && (
+            <ul className="w-full max-w-lg max-h-96 overflow-auto divide-y rounded-xl bg-white shadow p-4 text-sm">
+              {FILES.map((f) => {
+                const status = fileStatuses[f];
+                return (
+                  <li key={f} className="py-2 flex items-start space-x-3">
+                    {renderIcon(status.state)}
+                    <div className="flex-1">
+                      <p className="font-medium break-all">
+                        {f.split("/").pop()}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {status.state === "pending" && "Waiting"}
+                        {status.state === "processing" && "Analyzing…"}
+                        {status.state === "done" && "Analyzed"}
+                        {status.state === "error" && status.error}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {/* Current file info */}
+          {currentFile && (
+            <p className="text-xs text-gray-600">
+              Analyzing: {currentFile.split("/").pop()}
+            </p>
+          )}
+        </>
+      ) : (
+        <div className="w-full h-full overflow-auto bg-white">
+          <HealthBlueprintUI blueprint={typeof blueprint === "string" ? JSON.parse(blueprint) : blueprint} />
+          {/* <pre className="whitespace-pre-wrap text-sm">{typeof blueprint === "string" ? blueprint : JSON.stringify(blueprint, null, 2)}</pre> */}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
     </div>
   );
 }
