@@ -88,7 +88,7 @@ export default function HealthBlueprintUI({
   const labs = (blueprint as any)?.overall_health_summary_watchlist?.vitals_lab_highlights as any | undefined;
 
   return (
-    <div className="mx-auto w-full max-w-md p-4 bg-[#FAF6F2]">
+    <div className="mx-auto w-full max-w-md bg-[#FAF6F2]">
       {/* Banner */}
       <div className="rounded-2xl overflow-hidden shadow-sm border border-[#F0E4DC]">
         <div className="bg-gradient-to-b from-[#D36B3B] to-[#C55728] p-4 pb-5 rounded-b-none">
